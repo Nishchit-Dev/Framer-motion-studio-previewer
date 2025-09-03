@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useState } from 'react'
 import { createRoot } from 'react-dom/client'
-import { motion } from 'framer-motion'
+import { motion,AnimatePresence  } from 'framer-motion'
 import * as Babel from '@babel/standalone'
 
 /** Find capitalized JSX tags (likely custom components) so we can stub them */
@@ -74,18 +74,28 @@ function renderFromJSX(jsx: string): React.ReactNode {
 
 type Payload = { jsx?: string }
 
+function hash(s: string) {
+    let h = 0
+    for (let i = 0; i < s.length; i++) h = (h * 31 + s.charCodeAt(i)) | 0
+    return String(h >>> 0)
+}
+
 function App() {
     const [payload, setPayload] = useState<Payload>({})
-    const jsx = payload.jsx ?? ''
+    const [seq, setSeq] = useState(0) // <-- increments every preview
 
     useEffect(() => {
         const onMsg = (e: MessageEvent) => {
-            if (e.data?.type === 'render') setPayload(e.data.payload || {})
+            if (e.data?.type === 'render') {
+                setPayload(e.data.payload || {})
+                setSeq((n) => n + 1) // <-- bump to force remount
+            }
         }
         window.addEventListener('message', onMsg)
         return () => window.removeEventListener('message', onMsg)
     }, [])
 
+    const jsx = payload.jsx ?? ''
     const element = useMemo(() => {
         if (!jsx) return null
         try {
@@ -94,13 +104,14 @@ function App() {
             const msg = (err as Error)?.message ?? String(err)
             return (
                 <div style={{ color: '#ff6b6b', whiteSpace: 'pre-wrap' }}>
-                    Failed to render selection:
-                    {'\n'}
+                    Failed to render selection:{'\n'}
                     {msg}
                 </div>
             )
         }
     }, [jsx])
+
+    const remountKey = useMemo(() => `${hash(jsx)}-${seq}`, [jsx, seq]) // <-- unique per preview
 
     return (
         <div
@@ -127,12 +138,19 @@ function App() {
                         borderRadius: 10,
                     }}
                 >
-                    {/* LIVE PREVIEW */}
-                    {element || (
-                        <div style={{ opacity: 0.6 }}>
-                            Select JSX and run Preview
+                    {/* 🔁 Force remount so initial→animate runs each time */}
+                    <AnimatePresence mode="wait">
+                        <div
+                            key={remountKey}
+                            style={{ display: 'grid', placeItems: 'center' }}
+                        >
+                            {element || (
+                                <div style={{ opacity: 0.6 }}>
+                                    Select JSX and run Preview
+                                </div>
+                            )}
                         </div>
-                    )}
+                    </AnimatePresence>
                 </div>
 
                 <pre
@@ -146,6 +164,13 @@ function App() {
                 >
                     {jsx || '<no selection>'}
                 </pre>
+            </div>
+
+            {/* (Optional) A Replay button to rerun the same selection */}
+            <div style={{ marginTop: 10 }}>
+                <button onClick={() => setSeq((n) => n + 1)}>
+                    Replay animation
+                </button>
             </div>
         </div>
     )
