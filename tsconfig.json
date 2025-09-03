@@ -1,10 +1,17 @@
 {
     "compilerOptions": {
-        "jsx": "react-jsx",
         "target": "ES2020",
-        "module": "ESNext",
+        "module": "commonjs",
+        "lib": ["ES2020"],
         "moduleResolution": "node",
-        "strict": true
+        "esModuleInterop": true,
+        "allowSyntheticDefaultImports": true,
+        "strict": true,
+        "outDir": "out",
+        "rootDir": "src",
+        "types": ["node", "vscode"],
+        "skipLibCheck": true
     },
-    "include": ["media/**/*.ts", "media/**/*.tsx"]
+    "include": ["src/**/*.ts"],
+    "exclude": ["node_modules", ".vscode-test", "media"] // <-- important
 }

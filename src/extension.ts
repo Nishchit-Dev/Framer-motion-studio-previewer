@@ -1,81 +1,85 @@
 import * as vscode from 'vscode'
-import { parseSelection } from './parse' // you write this using Babel or TS
+
+let panel: vscode.WebviewPanel | undefined
+const VIEW_TYPE = 'framerMotionStudio'
 
 export function activate(ctx: vscode.ExtensionContext) {
     ctx.subscriptions.push(
-        vscode.commands.registerCommand('framerMotion.openStudio', () =>
-            openStudio(ctx)
-        ),
+        vscode.commands.registerCommand('framerMotion.openStudio', () => {
+            const p = ensurePanel(ctx)
+            void p.webview.postMessage({ type: 'hello' })
+        }),
         vscode.commands.registerCommand('framerMotion.previewHere', () =>
             previewHere(ctx)
         )
     )
 }
 
-async function previewHere(ctx: vscode.ExtensionContext) {
-    const ed = vscode.window.activeTextEditor
-    if (!ed) return
-    const sel = ed.selection.isEmpty
-        ? ed.document.lineAt(ed.selection.active.line).range
-        : ed.selection
-    const code = ed.document.getText(sel)
-    const payload = parseSelection(code) // { jsx, variants, transition, errors }
-
-    const panel = getPanel(ctx, 'Framer Motion Preview')
-    panel.webview.html = getHtml(ctx, panel.webview)
-    panel.webview.postMessage({ type: 'render', payload })
-
-    panel.webview.onDidReceiveMessage(async (msg) => {
-        if (msg.type === 'applyFix') {
-            const edit = new vscode.WorkspaceEdit()
-            edit.replace(ed.document.uri, sel, msg.fixedCode)
-            await vscode.workspace.applyEdit(edit)
-        }
-    })
-}
-
-let studioPanel: vscode.WebviewPanel | undefined
-function openStudio(ctx: vscode.ExtensionContext) {
-    studioPanel = getPanel(ctx, 'Framer Motion Studio', studioPanel)
-    studioPanel.webview.html = getHtml(ctx, studioPanel.webview)
-}
-
-function getPanel(
-    ctx: vscode.ExtensionContext,
-    title: string,
-    existing?: vscode.WebviewPanel
-) {
-    const panel =
-        existing ??
-        vscode.window.createWebviewPanel(
-            'framerMotionStudio',
-            title,
+function ensurePanel(ctx: vscode.ExtensionContext): vscode.WebviewPanel {
+    if (!panel) {
+        panel = vscode.window.createWebviewPanel(
+            VIEW_TYPE,
+            'Framer Motion Studio',
             vscode.ViewColumn.Beside,
             {
                 enableScripts: true,
+                retainContextWhenHidden: true,
                 localResourceRoots: [
                     vscode.Uri.joinPath(ctx.extensionUri, 'media'),
                 ],
             }
         )
+        panel.onDidDispose(() => {
+            panel = undefined
+        })
+        panel.webview.html = getHtml(ctx, panel.webview)
+    } else {
+        try {
+            panel.reveal(vscode.ViewColumn.Beside)
+        } catch {
+            panel = undefined
+            return ensurePanel(ctx)
+        }
+    }
     return panel
+}
+
+async function previewHere(ctx: vscode.ExtensionContext) {
+    const ed = vscode.window.activeTextEditor
+    if (!ed) return
+
+    const sel = ed.selection.isEmpty
+        ? ed.document.lineAt(ed.selection.active.line).range
+        : ed.selection
+
+    const jsx = ed.document.getText(sel)
+
+    const p = ensurePanel(ctx)
+    await p.webview.postMessage({ type: 'render', payload: { jsx } })
 }
 
 function getHtml(ctx: vscode.ExtensionContext, webview: vscode.Webview) {
     const scriptUri = webview.asWebviewUri(
         vscode.Uri.joinPath(ctx.extensionUri, 'media', 'main.js')
     )
-    const styleUri = webview.asWebviewUri(
-        vscode.Uri.joinPath(ctx.extensionUri, 'media', 'main.css')
-    )
-    const csp = `default-src 'none'; img-src data:; style-src ${webview.cspSource} 'unsafe-inline'; script-src ${webview.cspSource};`
+
+    // ✅ Allow 'unsafe-eval' so @babel/standalone and new Function() can run
+    const csp = [
+        "default-src 'none';",
+        `img-src ${webview.cspSource} data:;`,
+        `style-src ${webview.cspSource} 'unsafe-inline';`,
+        `font-src ${webview.cspSource};`,
+        `script-src ${webview.cspSource} 'unsafe-eval';`,
+    ].join(' ')
+
     return `<!doctype html>
 <html>
 <head>
-<meta charset="utf-8" />
-<meta http-equiv="Content-Security-Policy" content="${csp}">
-<link rel="stylesheet" href="${styleUri}">
-<title>Framer Motion Studio</title>
+  <meta charset="utf-8" />
+  <meta http-equiv="Content-Security-Policy" content="${csp}">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Framer Motion Studio</title>
+  <style>html,body{padding:0;margin:0}</style>
 </head>
 <body>
   <div id="app"></div>

@@ -6,6 +6,10 @@
   "engines": {
     "vscode": "^1.103.0"
   },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/Nishchit-Dev/Framer-motion-studio-previewer.git"
+  },
   "categories": [
     "Other"
   ],
@@ -30,23 +34,24 @@
     "keybindings": [
       {
         "command": "framerMotion.previewHere",
-        "key": "ctrl+alt+m",
+        "key": "ctrl+alt+shift+m",
         "mac": "cmd+alt+m"
       }
     ]
   },
   "scripts": {
-    "vscode:prepublish": "npm run compile",
     "watch": "tsc -watch -p ./",
     "pretest": "npm run compile && npm run lint",
     "lint": "eslint src",
     "test": "vscode-test",
+    "compile": "tsc -p ./",
     "bundle:webview": "esbuild media/main.tsx --bundle --minify --target=es2020 --format=iife --outfile=media/main.js",
     "watch:webview": "esbuild media/main.tsx --bundle --watch --target=es2020 --format=iife --outfile=media/main.js",
-    "compile": "tsc -p ./"
+    "vscode:prepublish": "npm run compile && npm run bundle:webview"
   },
   "devDependencies": {
     "@types/babel__generator": "^7.27.0",
+    "@types/babel__standalone": "^7.1.9",
     "@types/babel__traverse": "^7.28.0",
     "@types/mocha": "^10.0.10",
     "@types/node": "22.x",
@@ -64,6 +69,7 @@
   "dependencies": {
     "@babel/generator": "^7.28.3",
     "@babel/parser": "^7.28.3",
+    "@babel/standalone": "^7.28.3",
     "@babel/traverse": "^7.28.3",
     "@babel/types": "^7.28.2",
     "framer-motion": "^12.23.12",
