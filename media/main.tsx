@@ -1,8 +1,8 @@
 import React, { useEffect, useMemo, useState } from 'react'
 import { createRoot } from 'react-dom/client'
-import { motion,AnimatePresence  } from 'framer-motion'
+import { motion, AnimatePresence } from 'framer-motion'
 import * as Babel from '@babel/standalone'
-
+import { codeToHtml } from 'shiki'
 /** Find capitalized JSX tags (likely custom components) so we can stub them */
 function collectUppercaseComponents(src: string): string[] {
     const re = /<([A-Z][A-Za-z0-9_]*)\b/g
@@ -36,7 +36,7 @@ function renderFromJSX(jsx: string): React.ReactNode {
                         margin: 4,
                         borderRadius: 6,
                         background: 'rgba(255,255,255,0.08)',
-                        border: '1px dashed rgba(255,255,255,0.2)',
+                        border: '2px dashed #818cf8',
                         fontSize: 12,
                         color: 'rgba(255,255,255,0.7)',
                     },
@@ -83,6 +83,7 @@ function hash(s: string) {
 function App() {
     const [payload, setPayload] = useState<Payload>({})
     const [seq, setSeq] = useState(0) // <-- increments every preview
+    const [codeSectiom, setCodeSection] = useState('')
 
     useEffect(() => {
         const onMsg = (e: MessageEvent) => {
@@ -99,6 +100,12 @@ function App() {
     const element = useMemo(() => {
         if (!jsx) return null
         try {
+            codeToHtml(jsx, {
+                lang: 'tsx',
+                theme: 'min-dark',
+            }).then((highlightedCode) => {
+                setCodeSection(highlightedCode)
+            })
             return renderFromJSX(jsx)
         } catch (err) {
             const msg = (err as Error)?.message ?? String(err)
@@ -124,25 +131,68 @@ function App() {
 
             <div
                 style={{
-                    display: 'grid',
-                    gridTemplateColumns: '1fr 1fr',
+                    display: 'flex',
+                    width: 'full',
+                    flex: 1,
+                    flexDirection: 'column',
+                    // gridTemplateColumns: '1fr 1fr',
                     gap: 16,
                 }}
             >
                 <div
                     style={{
                         minHeight: 240,
-                        display: 'grid',
+                        display: 'flex',
+                        justifyContent: 'center',
                         placeItems: 'center',
-                        background: 'rgba(255,255,255,0.04)',
+                        background: 'rgba(0, 0, 0, 0.04)',
                         borderRadius: 10,
                     }}
                 >
+                    <div
+                        style={{
+                            position: 'absolute',
+                            top: 16,
+                            right: 16,
+                            zIndex: 1,
+                        }}
+                    >
+                        <div
+                            onClick={() => setSeq((n) => n + 1)}
+                            style={{
+                                cursor: 'pointer',
+                                background: 'rgba(255,255,255,0.15)',
+                                borderRadius: '50%',
+                                padding: 4,
+                                boxShadow: '0 1px 4px rgba(0,0,0,0.08)',
+                                display: 'flex',
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                            }}
+                            title="Replay animation"
+                        >
+                            <svg
+                                xmlns="http://www.w3.org/2000/svg"
+                                width="16"
+                                height="16"
+                                viewBox="0 0 24 24"
+                                fill="none"
+                                stroke="currentColor"
+                                strokeWidth="2"
+                                strokeLinecap="round"
+                                strokeLinejoin="round"
+                                className="lucide lucide-rotate-ccw-icon lucide-rotate-ccw"
+                            >
+                                <path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8" />
+                                <path d="M3 3v5h5" />
+                            </svg>
+                        </div>
+                    </div>
                     {/* 🔁 Force remount so initial→animate runs each time */}
                     <AnimatePresence mode="wait">
                         <div
                             key={remountKey}
-                            style={{ display: 'grid', placeItems: 'center' }}
+                            style={{ display: '', placeItems: 'center' }}
                         >
                             {element || (
                                 <div style={{ opacity: 0.6 }}>
@@ -153,7 +203,7 @@ function App() {
                     </AnimatePresence>
                 </div>
 
-                <pre
+                {/* <pre
                     style={{
                         margin: 0,
                         padding: 12,
@@ -162,16 +212,27 @@ function App() {
                         whiteSpace: 'pre-wrap',
                     }}
                 >
-                    {jsx || '<no selection>'}
-                </pre>
+                    <code>
+                        {jsx
+                            ? `\`\`\`tsx
+        ${jsx}
+        \`\`\``
+                            : '<no selection>'}
+                    </code>
+                </pre> */}
+                <div
+                    style={{
+                        margin: 0,
+                        padding: 12,
+                        borderRadius: 10,
+                        background: 'rgba(0,0,0,0.25)',
+                        // whiteSpace: 'pre-wrap',
+                    }}
+                    dangerouslySetInnerHTML={{ __html: codeSectiom }}
+                />
             </div>
 
             {/* (Optional) A Replay button to rerun the same selection */}
-            <div style={{ marginTop: 10 }}>
-                <button onClick={() => setSeq((n) => n + 1)}>
-                    Replay animation
-                </button>
-            </div>
         </div>
     )
 }
